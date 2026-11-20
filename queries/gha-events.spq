@@ -1,0 +1,20 @@
+from 'raw/gha/ghasample.bsup'
+| values {
+    id, type,
+    ts: created_at::timestamp,
+    actor: actor.login,
+    repo: repo.name,
+    org: coalesce(org.login, null),
+    action: coalesce(payload.action, null),
+    number: coalesce(payload.pull_request.number, payload.issue.number, null),
+    title: coalesce(payload.pull_request.title, payload.issue.title, null),
+    language: coalesce(payload.pull_request.base.repo.language, null),
+    state: coalesce(payload.pull_request.state, payload.issue.state, null),
+    merged: coalesce(payload.pull_request.merged, null),
+    additions: coalesce(payload.pull_request.additions, null),
+    deletions: coalesce(payload.pull_request.deletions, null),
+    files: coalesce(payload.pull_request.changed_files, null),
+    review: coalesce(payload.review.state, null),
+    labels: [unnest coalesce(payload.pull_request.labels, payload.issue.labels, []) | values name],
+    assignees: [unnest [...coalesce(payload.pull_request.assignees, payload.issue.assignees, []), coalesce(payload.pull_request.assignee, payload.issue.assignee, null)] | where this is not null | values login]
+  }

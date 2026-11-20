@@ -1,0 +1,311 @@
+diff -ruN a/pkg/storage/router.go b/pkg/storage/router.go
+--- a/pkg/storage/router.go	2026-11-20 05:07:25
++++ b/pkg/storage/router.go	2026-11-20 05:07:25
+@@ -40,7 +40,7 @@
+ 	case HTTPScheme, HTTPSScheme:
+ 		engine = NewHTTP()
+ 	case S3Scheme:
+-		engine = NewS3()
++		engine = newS3()
+ 	default:
+ 		panic(fmt.Sprintf("storage.Router.Enable: unknown scheme: %q", scheme))
+ 	}
+diff -ruN a/pkg/storage/s3.go b/pkg/storage/s3.go
+--- a/pkg/storage/s3.go	2026-11-20 05:07:25
++++ b/pkg/storage/s3.go	2026-11-20 05:07:25
+@@ -1,3 +1,5 @@
++//go:build !nos3
++
+ package storage
+ 
+ import (
+@@ -79,3 +81,5 @@
+ 	}
+ 	return err
+ }
++
++func newS3() Engine { return NewS3() }
+diff -ruN a/pkg/storage/s3_none.go b/pkg/storage/s3_none.go
+--- a/pkg/storage/s3_none.go	1969-12-31 19:00:00
++++ b/pkg/storage/s3_none.go	2026-11-20 05:07:25
+@@ -0,0 +1,24 @@
++//go:build nos3
++
++package storage
++
++import (
++	"context"
++	"errors"
++	"io"
++)
++
++var errNoS3 = errors.New("S3 support not included in this build")
++
++type noS3 struct{}
++
++func newS3() Engine { return noS3{} }
++
++func (noS3) Get(context.Context, *URI) (Reader, error)          { return nil, errNoS3 }
++func (noS3) Put(context.Context, *URI) (io.WriteCloser, error)  { return nil, errNoS3 }
++func (noS3) PutIfNotExists(context.Context, *URI, []byte) error { return errNoS3 }
++func (noS3) Delete(context.Context, *URI) error                 { return errNoS3 }
++func (noS3) DeleteByPrefix(context.Context, *URI) error         { return errNoS3 }
++func (noS3) Exists(context.Context, *URI) (bool, error)         { return false, errNoS3 }
++func (noS3) Size(context.Context, *URI) (int64, error)          { return 0, errNoS3 }
++func (noS3) List(context.Context, *URI) ([]Info, error)         { return nil, errNoS3 }
+diff -ruN a/sio/anyio/arrow.go b/sio/anyio/arrow.go
+--- a/sio/anyio/arrow.go	1969-12-31 19:00:00
++++ b/sio/anyio/arrow.go	2026-11-20 05:07:25
+@@ -0,0 +1,43 @@
++//go:build !noarrow
++
++package anyio
++
++import (
++	"context"
++	"io"
++
++	"github.com/superdb/super"
++	"github.com/superdb/super/sio/arrowio"
++	"github.com/superdb/super/sio/parquetio"
++	"github.com/superdb/super/vector/vio"
++)
++
++func newArrowReader(sctx *super.Context, r io.Reader) (vio.Puller, error) {
++	ar, err := arrowio.NewReader(sctx, r)
++	if err != nil {
++		return nil, err
++	}
++	return newVioPuller(sctx, ar), nil
++}
++
++func probeArrow(r io.Reader) error {
++	ar, err := arrowio.NewReader(super.NewContext(), r)
++	if err != nil {
++		return err
++	}
++	defer ar.Close()
++	_, err = ar.Read()
++	return err
++}
++
++func newParquetReader(ctx context.Context, sctx *super.Context, r io.Reader, p vio.Pushdown, n int) (vio.Puller, error) {
++	return parquetio.NewReader(ctx, sctx, r, p, n)
++}
++
++func newArrowWriter(sctx *super.Context, w io.WriteCloser) (vio.PushCloser, error) {
++	return newDefuser(sctx, arrowio.NewWriter(w)), nil
++}
++
++func newParquetWriter(sctx *super.Context, w io.WriteCloser) (vio.PushCloser, error) {
++	return newDefuser(sctx, parquetio.NewWriter(w)), nil
++}
+diff -ruN a/sio/anyio/arrow_none.go b/sio/anyio/arrow_none.go
+--- a/sio/anyio/arrow_none.go	1969-12-31 19:00:00
++++ b/sio/anyio/arrow_none.go	2026-11-20 05:07:25
+@@ -0,0 +1,22 @@
++//go:build noarrow
++
++package anyio
++
++import (
++	"context"
++	"errors"
++	"io"
++
++	"github.com/superdb/super"
++	"github.com/superdb/super/vector/vio"
++)
++
++var errNoArrow = errors.New("Arrow and Parquet support not included in this build")
++
++func newArrowReader(*super.Context, io.Reader) (vio.Puller, error) { return nil, errNoArrow }
++func probeArrow(io.Reader) error                                    { return errNoArrow }
++func newParquetReader(context.Context, *super.Context, io.Reader, vio.Pushdown, int) (vio.Puller, error) {
++	return nil, errNoArrow
++}
++func newArrowWriter(*super.Context, io.WriteCloser) (vio.PushCloser, error)   { return nil, errNoArrow }
++func newParquetWriter(*super.Context, io.WriteCloser) (vio.PushCloser, error) { return nil, errNoArrow }
+diff -ruN a/sio/anyio/lookup.go b/sio/anyio/lookup.go
+--- a/sio/anyio/lookup.go	2026-11-20 05:07:25
++++ b/sio/anyio/lookup.go	2026-11-20 05:07:25
+@@ -8,12 +8,10 @@
+ 	"github.com/superdb/super"
+ 	"github.com/superdb/super/sbuf"
+ 	"github.com/superdb/super/sio"
+-	"github.com/superdb/super/sio/arrowio"
+ 	"github.com/superdb/super/sio/bsupio"
+ 	"github.com/superdb/super/sio/csvio"
+ 	"github.com/superdb/super/sio/jsonio"
+ 	"github.com/superdb/super/sio/lineio"
+-	"github.com/superdb/super/sio/parquetio"
+ 	"github.com/superdb/super/sio/supio"
+ 	"github.com/superdb/super/sio/zeekio"
+ 	"github.com/superdb/super/vector/vio"
+@@ -22,11 +20,7 @@
+ func lookupReader(ctx context.Context, sctx *super.Context, r io.Reader, opts ReaderOpts) (vio.Puller, error) {
+ 	switch opts.Format {
+ 	case "arrows":
+-		r, err := arrowio.NewReader(sctx, r)
+-		if err != nil {
+-			return nil, err
+-		}
+-		return newVioPuller(sctx, r), nil
++		return newArrowReader(sctx, r)
+ 	case "bsup":
+ 		return bsupio.NewReader(ctx, sctx, r, opts.Pushdown, opts.Progress, opts.ConcurrentReaders)
+ 	case "csv":
+@@ -36,7 +30,7 @@
+ 	case "json":
+ 		return jsonio.NewReader(context.Background(), sctx, r, opts.Pushdown, opts.ConcurrentReaders, opts.InputCap), nil
+ 	case "parquet":
+-		return parquetio.NewReader(ctx, sctx, r, opts.Pushdown, opts.ConcurrentReaders)
++		return newParquetReader(ctx, sctx, r, opts.Pushdown, opts.ConcurrentReaders)
+ 	case "sup":
+ 		return newVioPuller(sctx, supio.NewReader(sctx, r)), nil
+ 	case "tsv":
+diff -ruN a/sio/anyio/reader.go b/sio/anyio/reader.go
+--- a/sio/anyio/reader.go	2026-11-20 05:07:25
++++ b/sio/anyio/reader.go	2026-11-20 05:07:25
+@@ -14,11 +14,9 @@
+ 	"github.com/superdb/super/bsup"
+ 	"github.com/superdb/super/sbuf"
+ 	"github.com/superdb/super/sio"
+-	"github.com/superdb/super/sio/arrowio"
+ 	"github.com/superdb/super/sio/bsupio"
+ 	"github.com/superdb/super/sio/csvio"
+ 	"github.com/superdb/super/sio/jsonio"
+-	"github.com/superdb/super/sio/parquetio"
+ 	"github.com/superdb/super/sio/supio"
+ 	"github.com/superdb/super/sio/zeekio"
+ 	"github.com/superdb/super/vector/vio"
+@@ -63,15 +61,14 @@
+ 
+ 	parquetErr := isParquetStream(ctx, track)
+ 	if parquetErr == nil {
+-		return parquetio.NewReader(ctx, sctx, track.Reader(), opts.Pushdown, opts.ConcurrentReaders)
++		return newParquetReader(ctx, sctx, track.Reader(), opts.Pushdown, opts.ConcurrentReaders)
+ 	}
+ 	parquetErr = fmt.Errorf("parquet: %w", parquetErr)
+ 	track.Reset()
+ 
+ 	arrowsErr := isArrowStream(track)
+ 	if arrowsErr == nil {
+-		r, err := arrowio.NewReader(sctx, track.Reader())
+-		return newVioPuller(sctx, r), err
++		return newArrowReader(sctx, track.Reader())
+ 	}
+ 	arrowsErr = fmt.Errorf("arrows: %w", arrowsErr)
+ 	track.Reset()
+@@ -151,13 +148,7 @@
+ 		return errors.New("schema message length exceeds 1 MiB")
+ 	}
+ 	track.Reset()
+-	zrc, err := arrowio.NewReader(super.NewContext(), track)
+-	if err != nil {
+-		return err
+-	}
+-	defer zrc.Close()
+-	_, err = zrc.Read()
+-	return err
++	return probeArrow(track)
+ }
+ 
+ func isCSVStream(track *Track, delim rune, name string) error {
+@@ -202,7 +193,7 @@
+ 		}
+ 		*track = *NewTrack(bytes.NewReader(b))
+ 	}
+-	_, err := parquetio.NewReader(ctx, super.NewContext(), track.Reader(), nil, 1)
++	_, err := newParquetReader(ctx, super.NewContext(), track.Reader(), nil, 1)
+ 	return err
+ }
+ 
+diff -ruN a/sio/anyio/writer.go b/sio/anyio/writer.go
+--- a/sio/anyio/writer.go	2026-11-20 05:07:25
++++ b/sio/anyio/writer.go	2026-11-20 05:07:25
+@@ -7,12 +7,10 @@
+ 	"github.com/superdb/super"
+ 	"github.com/superdb/super/bsup"
+ 	"github.com/superdb/super/runtime/expr"
+-	"github.com/superdb/super/sio/arrowio"
+ 	"github.com/superdb/super/sio/csvio"
+ 	"github.com/superdb/super/sio/dbio"
+ 	"github.com/superdb/super/sio/jsonio"
+ 	"github.com/superdb/super/sio/lineio"
+-	"github.com/superdb/super/sio/parquetio"
+ 	"github.com/superdb/super/sio/supio"
+ 	"github.com/superdb/super/sio/zeekio"
+ 	"github.com/superdb/super/vector"
+@@ -35,7 +33,7 @@
+ func NewWriter(sctx *super.Context, w io.WriteCloser, opts WriterOpts) (vio.PushCloser, error) {
+ 	switch opts.Format {
+ 	case "arrows":
+-		return newDefuser(sctx, arrowio.NewWriter(w)), nil
++		return newArrowWriter(sctx, w)
+ 	case "bsup":
+ 		return bsup.NewWriterWithOpts(w, opts.BSUP), nil
+ 	case "csv":
+@@ -49,7 +47,7 @@
+ 	case "null":
+ 		return &nullWriter{}, nil
+ 	case "parquet":
+-		return newDefuser(sctx, parquetio.NewWriter(w)), nil
++		return newParquetWriter(sctx, w)
+ 	case "sup", "":
+ 		w := vio.PushCloser(supio.NewWriter(w, opts.SUP))
+ 		if !opts.SUPFusion {
+diff -ruN a/sio/zeekio/builder.go b/sio/zeekio/builder.go
+--- a/sio/zeekio/builder.go	2026-11-20 05:07:25
++++ b/sio/zeekio/builder.go	2026-11-20 05:07:25
+@@ -3,6 +3,7 @@
+ import (
+ 	"bytes"
+ 	"errors"
++	"github.com/superdb/super/sup"
+ 	"net/netip"
+ 	"unicode/utf8"
+ 
+@@ -10,7 +11,6 @@
+ 	"github.com/superdb/super/pkg/byteconv"
+ 	"github.com/superdb/super/pkg/nano"
+ 	"github.com/superdb/super/scode"
+-	"github.com/superdb/super/sio/arrowio"
+ 	"golang.org/x/text/unicode/norm"
+ )
+ 
+@@ -83,7 +83,7 @@
+ 		}
+ 		val := values[0]
+ 		values = values[1:]
+-		nullTag, nonNullTag, typ := arrowio.NullableUnionTagsAndType(f.Type.(*super.TypeUnion))
++		nullTag, nonNullTag, typ := nullableUnionTagsAndType(f.Type.(*super.TypeUnion))
+ 		switch typ := typ.(type) {
+ 		case *super.TypeArray, *super.TypeSet:
+ 			if string(val) == "-" {
+@@ -120,7 +120,7 @@
+ }
+ 
+ func (b *builder) appendPrimitive(typ super.Type, val []byte) error {
+-	nullTag, nonNullTag, typ := arrowio.NullableUnionTagsAndType(typ.(*super.TypeUnion))
++	nullTag, nonNullTag, typ := nullableUnionTagsAndType(typ.(*super.TypeUnion))
+ 	if string(val) == "-" {
+ 		super.BuildUnion(&b.Builder, nullTag, nil)
+ 		return nil
+@@ -212,4 +212,16 @@
+ 	}
+ 	super.BuildUnion(&b.Builder, nonNullTag, b.buf)
+ 	return nil
++}
++
++func nullableUnionTagsAndType(union *super.TypeUnion) (nullTag, nonNullTag int, nonNullType super.Type) {
++	if len(union.Types) != 2 {
++		panic(sup.FormatType(union))
++	}
++	if union.Types[0] == super.TypeNull {
++		nullTag, nonNullTag = 0, 1
++	} else {
++		nullTag, nonNullTag = 1, 0
++	}
++	return nullTag, nonNullTag, union.Types[nonNullTag]
+ }

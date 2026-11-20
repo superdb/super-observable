@@ -1,0 +1,10 @@
+node_modules/
+dist/
+raw/
+bin/
+src/.observablehq/cache/
+src/lib/super.wasm
+src/lib/wasm_exec.js
+wasm/.super-src/
+/shot-*.png
+.DS_Store

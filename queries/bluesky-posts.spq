@@ -1,0 +1,11 @@
+-- One row per created post: what the browser loads for the explorer.
+where kind == 'commit' and commit.operation == 'create' and commit.collection == 'app.bsky.feed.post'
+| values {
+    ts: (time_us * 1000)::timestamp,
+    author: did,
+    text: commit.record.text,
+    lang: coalesce(commit.record.langs[0], null::string),
+    reply: has(commit.record, 'reply'),
+    media: coalesce(regexp_replace(commit.record.embed['$type'], '^app\\.bsky\\.embed\\.|#main$', ''), 'none'),
+    length: len(commit.record.text)
+  }

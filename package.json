@@ -1,0 +1,19 @@
+{
+  "name": "super-observable-proto",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-lib": "esbuild vendor-super-ts/src/index.ts --bundle --format=esm --target=es2022 --minify --outfile=src/components/super-ts.js",
+    "data": "node scripts/gen-data.mjs",
+    "bench": "node scripts/bench.mjs",
+    "dev": "observable preview",
+    "build": "observable build"
+  },
+  "devDependencies": {
+    "@observablehq/framework": "^1.13.4",
+    "apache-arrow": "^21.2.0",
+    "esbuild": "^0.28.2",
+    "parquet-wasm": "^0.9.0",
+    "playwright-core": "^1.65.1"
+  }
+}

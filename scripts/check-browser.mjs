@@ -1,0 +1,22 @@
+// Ouvre le site construit (servi sur :4321) dans Chrome headless, capture la démo et lance le banc.
+import { chromium } from "playwright-core"
+const browser = await chromium.launch({ channel: "chrome" })
+const page = await browser.newPage({ viewport: { width: 1200, height: 900 } })
+const errors = []
+page.on("pageerror", (e) => errors.push(e.message))
+page.on("console", (m) => m.type() === "error" && errors.push(m.text()))
+let t = Date.now()
+await page.goto("http://localhost:4321/", { waitUntil: "networkidle" })
+await page.waitForSelector("figure svg, svg[class^=plot]", { timeout: 60000 })
+await page.waitForTimeout(1500)
+console.log(`index chargé en ${Date.now() - t} ms`)
+console.log("erreurs observables:", await page.locator(".observablehq--error").allInnerTexts())
+await page.screenshot({ path: "shot-index.png", fullPage: true })
+await page.goto("http://localhost:4321/bench", { waitUntil: "networkidle" })
+await page.getByRole("button", { name: /Lancer/ }).click()
+await page.waitForSelector("table td", { timeout: 180000 })
+await page.waitForTimeout(500)
+console.log(await page.locator("table").last().innerText())
+console.log("erreurs observables:", await page.locator(".observablehq--error").allInnerTexts())
+console.log("erreurs console:", errors)
+await browser.close()

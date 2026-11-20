@@ -1,0 +1,3 @@
+[submodule "vendor-super-ts"]
+	path = vendor-super-ts
+	url = https://github.com/superdb/super-ts
