@@ -1,7 +1,7 @@
 # SuperDB × Observable Framework: a proposal
 
-*Gilles Clément, November 20, 2026. Working prototype, demo site and measurements are ready to share. I suggest a new
-repository under the `superdb` organization (for example `superdb/super-observable`), created once the team agrees.*
+*Gilles Clément, November 20, 2026. The working prototype, demo site and measurements are in a public repository,
+[`superdb/super-observable`](https://github.com/superdb/super-observable).*
 
 ## TL;DR
 
@@ -269,7 +269,11 @@ The site is bilingual: English at the root and French under `/fr`, with a langua
 
 ### Running it locally
 
-Once the repository exists, clone it and run the steps below from its root.
+Clone the repository with its super-ts submodule, then run the steps below from its root:
+
+```sh
+git clone --recurse-submodules https://github.com/superdb/super-observable && cd super-observable
+```
 
 **Prerequisites:**
 - Go, at the version `superdb/super` requires;
