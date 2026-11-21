@@ -2,7 +2,7 @@
 # File sizes of a dataset, one JSON line per file: sizes.sh <dataset>
 # format: json.gz | bsup | parquet ; variant: null | projection | fused | full | no-record | super | clickhouse
 set -eu
-t() { stat -f %z "$1"; }
+t() { wc -c < "$1" | tr -d " "; }
 l() { printf '{"dataset":"%s","format":"%s","variant":%s,"file":"%s","bytes":%s}\n' "$1" "$2" "$3" "$(basename "$4")" "$(t "$4")"; }
 case "$1" in
 gha)
