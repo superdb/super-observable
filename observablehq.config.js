@@ -32,7 +32,7 @@ function parse(path) {
 
 export default {
   root: "src",
-  title: "SuperDB × Observable — prototype",
+  title: "SuperDB for Observable Framework — prototype",
   pages: [
     {name: "English", collapsible: true, open: false, pages: pages.en.map(([name, slug]) => ({name, path: `/${slug}`}))},
     {name: "Français", collapsible: true, open: false, pages: pages.fr.map(([name, slug]) => ({name, path: `/fr/${slug}`}))}

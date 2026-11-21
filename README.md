@@ -1,4 +1,4 @@
-# SuperDB × Observable Framework
+# SuperDB for Observable Framework
 
 *[Français](README.fr.md)*
 
