@@ -28,13 +28,13 @@ p:has(> img) {break-inside: avoid; break-after: avoid}
 p > em:only-child, img + br + em {font-size: 9pt; color: #555}
 hr {border: none; margin: 6pt 0}
 a {color: #4269d0; text-decoration: none}`;
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SuperDB × Observable Framework: a proposal</title><style>${css}</style></head><body>${body}</body></html>`;
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SuperDB for Observable Framework: a proposal</title><style>${css}</style></head><body>${body}</body></html>`;
 writeFileSync("PROPOSAL.tmp.html", html);
 const browser = await chromium.launch({channel: "chrome"});
 const page = await browser.newPage();
 await page.goto("file://" + resolve("PROPOSAL.tmp.html"), {waitUntil: "load"});
 await page.pdf({path: "PROPOSAL.pdf", format: "Letter", printBackground: true, displayHeaderFooter: true,
   headerTemplate: "<span></span>",
-  footerTemplate: `<div style="font: 8px Helvetica, Arial; color: #888; width: 100%; padding: 0 16mm; display: flex; justify-content: space-between"><span>SuperDB × Observable Framework: a proposal</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`});
+  footerTemplate: `<div style="font: 8px Helvetica, Arial; color: #888; width: 100%; padding: 0 16mm; display: flex; justify-content: space-between"><span>SuperDB for Observable Framework: a proposal</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`});
 await browser.close();
 rmSync("PROPOSAL.tmp.html");

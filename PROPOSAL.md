@@ -1,4 +1,4 @@
-# SuperDB × Observable Framework: a proposal
+# SuperDB for Observable Framework: a proposal
 
 *Gilles Clément, November 20, 2026. The working prototype, demo site and measurements are in a public repository,
 [`superdb/super-observable`](https://github.com/superdb/super-observable).*

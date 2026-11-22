@@ -1,4 +1,4 @@
-# Prototype SuperDB × Observable Framework (niveau 1)
+# Prototype SuperDB pour Observable Framework (niveau 1)
 
 *[English](README.md)*
 
