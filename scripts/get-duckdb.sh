@@ -16,7 +16,7 @@ ingest() { # dataset engine source target command...
   t=$(ms)
   if "$@" >/dev/null 2>"$tmp/err"; then
     printf '{"dataset":"%s","engine":"%s","source":"%s","bytes":%s,"ms":%s,"error":null}\n' \
-      "$dataset" "$engine" "$source" "$(stat -f %z "$target")" "$(($(ms) - t))" >>"$tmp/ingest.jsonl"
+      "$dataset" "$engine" "$source" "$(wc -c < "$target" | tr -d " ")" "$(($(ms) - t))" >>"$tmp/ingest.jsonl"
   else
     rm -f "$target"
     python3 -c 'import json,sys; print(json.dumps({"dataset":sys.argv[1],"engine":sys.argv[2],"source":sys.argv[3],"bytes":None,"ms":None,"error":open(sys.argv[4]).read().strip()}))' \
